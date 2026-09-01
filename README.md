@@ -1,5 +1,9 @@
 # Draw.io MCP Server
 
+Fork of [jgraph/drawio-mcp](https://github.com/jgraph/drawio-mcp). This copy
+opens diagrams in the **draw.io desktop** app by default (`DRAWIO_OPEN=desktop`).
+Set `DRAWIO_OPEN=browser` for the upstream tab at `app.diagrams.net`.
+
 The official [draw.io](https://www.draw.io) MCP (Model Context Protocol) server that enables LLMs to create and open diagrams in the draw.io editor.
 
 ## Four Ways to Create Diagrams
@@ -8,8 +12,8 @@ This repository offers four approaches for integrating draw.io with AI assistant
 
 | | [MCP App Server](#mcp-app-server) | [MCP Tool Server](#mcp-tool-server) | [Assistant Plugins](#assistant-plugins-claude-code-codex-cli-github-copilot) | [Project Instructions](#alternative-project-instructions-no-mcp-required) |
 |---|---|---|---|---|
-| **How it works** | Renders diagrams inline in chat | Opens diagrams in your browser | Generates `.drawio` files, optional PNG/SVG/PDF export or browser URL | Claude generates draw.io URLs via Python |
-| **Diagram output** | Interactive viewer embedded in conversation | draw.io editor in a new tab | `.drawio`, `.drawio.png` / `.svg` / `.pdf`, or browser URL | Clickable link to draw.io |
+| **How it works** | Renders diagrams inline in chat | Opens diagrams in draw.io Desktop (or the browser if `DRAWIO_OPEN=browser`) | Generates `.drawio` files, optional PNG/SVG/PDF export or browser URL | Claude generates draw.io URLs via Python |
+| **Diagram output** | Interactive viewer embedded in conversation | draw.io desktop window (or a browser tab) | `.drawio`, `.drawio.png` / `.svg` / `.pdf`, or browser URL | Clickable link to draw.io |
 | **Requires installation** | No (hosted at `mcp.draw.io`) | Yes (npm package) | One-line plugin install (draw.io Desktop only for PNG/SVG/PDF export) | No — just paste instructions |
 | **Supports XML, CSV, Mermaid** | XML only | ✅ All three | XML only (native format) | ✅ All three |
 | **Editable in draw.io** | Via "Open in draw.io" button | ✅ Directly | ✅ Directly | Via link |
@@ -44,7 +48,7 @@ You can also run the server locally via Node.js or deploy your own instance to C
 
 ## MCP Tool Server
 
-The original MCP server that opens diagrams directly in the draw.io editor. Supports XML, CSV, and Mermaid.js formats with lightbox and dark mode options. Published as [`@drawio/mcp`](https://www.npmjs.com/package/@drawio/mcp) on npm.
+The original MCP server that opens diagrams in the **draw.io desktop** app by default. Supports XML, CSV, and Mermaid.js. Published upstream as [`@drawio/mcp`](https://www.npmjs.com/package/@drawio/mcp). This fork lives at [VictorMarcolino/drawio-mcp](https://github.com/VictorMarcolino/drawio-mcp).
 
 Quick start: `npx @drawio/mcp`
 
@@ -130,7 +134,7 @@ nothing is sent.
 |---|---|
 | **MCP App Server — hosted (`mcp.draw.io`)** | **Yes** — it is sent to the draw.io server as the MCP request. Self-host instead (below) to keep it local. |
 | **MCP App Server — self-hosted** (local Node or your own Cloudflare) | No — processed by your server and embedded in HTML that renders client-side. |
-| **MCP Tool Server** (`@drawio/mcp`) | No — carried in the URL `#fragment`, which browsers do not transmit to the server. |
+| **MCP Tool Server** (`@drawio/mcp`) | **Desktop (default):** written to a temp file and opened by local draw.io. **Browser:** URL `#fragment` (not sent to the server). |
 | **Assistant Plugins** (Claude Code, Codex CLI, GitHub Copilot) | No — written locally and exported by your local draw.io Desktop CLI. |
 
 By default the servers do not write diagram content to their logs — only request

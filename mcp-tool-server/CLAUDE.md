@@ -1,12 +1,13 @@
 # MCP Tool Server
 
-The original draw.io MCP server. Opens diagrams directly in the draw.io editor via browser.
+The original draw.io MCP server. Opens diagrams in the local draw.io desktop app by default (`DRAWIO_OPEN=desktop`). Set `DRAWIO_OPEN=browser` for the upstream `#create=` URL.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/index.js` | Single-file server (stdio transport, vanilla JS, no build step) |
+| `src/index.js` | Stdio MCP server (vanilla JS, no build step) |
+| `src/open-diagram.js` | Desktop vs browser open: temp `.drawio`/`.mmd`/`.csv` + spawn `DRAWIO_CMD`, or `#create=` URL |
 | `src/libavoid-pass.js` | Server-side libavoid edge-routing pass for `open_drawio_xml` (`routing: "libavoid"`) — parses the mxGraphModel XML, runs the vendored routing core (`AvoidRouting.computeRoutes`), writes waypoints back |
 | `src/pages.js` | Local `.drawio` file page access for `list_pages`/`get_page`/`set_page` — regex-scans `<diagram>` blocks (same tag-boundary technique as `libavoid-pass.js`), decompresses/compresses per-page with `pako` as needed. Covered by `test/pages.test.js` (`npm test`) |
 | `vendor/libavoid/` | Vendored libavoid-js **node** build + `libavoid.wasm` (see its README). Loaded by path in plain Node — no inlining/base64 (that's the app server's sandbox concern) |

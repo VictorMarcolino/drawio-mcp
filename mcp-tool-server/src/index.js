@@ -3,17 +3,14 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import pako from "pako";
 import { routeXml } from "./libavoid-pass.js";
 import { assertPagePath, listPageMeta, readPageXml, writePageXml } from "./pages.js";
-import { spawn } from "child_process";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import { openDiagram } from "./open-diagram.js";
+import { existsSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { tmpdir } from "os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DRAWIO_BASE_URL = process.env.DRAWIO_BASE_URL || "https://app.diagrams.net/";
 
 // Single source for the version reported by --version and the MCP handshake.
 const packageInfo = JSON.parse(
@@ -39,7 +36,12 @@ Usage:
 
 Options:
   -h, --help              Show help
-  -v, --version           Show version`);
+  -v, --version           Show version
+
+Environment:
+  DRAWIO_OPEN             desktop (default) or browser
+  DRAWIO_CMD              path to the draw.io desktop app (default: drawio)
+  DRAWIO_BASE_URL         used only when DRAWIO_OPEN=browser`);
     process.exit(0);
   }
   else if (cliArgs[0] === "--version" || cliArgs[0] === "-v")
@@ -174,166 +176,13 @@ function loadIconSearch()
   return iconSearchPromise;
 }
 
-// Longest URL the Windows shell opens reliably from a .url file:
-// the InternetShortcut handler fails with Win32 error 122 ("The data
-// area passed to a system call is too small") beyond
-// INTERNET_MAX_URL_LENGTH (2083), so stay under it with some headroom.
-const WIN_URL_FILE_MAX_LENGTH = 2000;
-
-/**
- * Builds an HTML page that forwards the browser to the given URL from
- * JavaScript. Browsers accept URLs far beyond OS shell limits, and the
- * #create= fragment never leaves the client, so this has no practical
- * length cap.
- */
-function buildRedirectHtml(url)
-{
-  // The #create= payload is percent-encoded, but DRAWIO_BASE_URL comes
-  // from the environment, so escape anything that could break out of
-  // the string literal or close the script element.
-  const escaped = url
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, "\\\"")
-    .replace(/</g, "\\u003C");
-
-  return "<!DOCTYPE html>\n" +
-    "<html>\n" +
-    "<head>\n" +
-    "<meta charset=\"utf-8\">\n" +
-    "<title>draw.io</title>\n" +
-    "</head>\n" +
-    "<body>\n" +
-    "Opening draw.io...\n" +
-    "<script>\n" +
-    "window.location.replace(\"" + escaped + "\");\n" +
-    "</script>\n" +
-    "</body>\n" +
-    "</html>\n";
-}
-
-/**
- * Opens a URL in the default browser (cross-platform)
- */
-function openBrowser(url)
-{
-  let child;
-
-  if (process.platform === "win32")
-  {
-    // cmd.exe's "start" command treats & as a command separator and
-    // drops everything after # in URLs, so the #create=... fragment
-    // (which carries the entire diagram payload) is silently lost.
-    // Writing a temporary .url file preserves the full URL intact, but
-    // only up to the shell's InternetShortcut length limit — beyond it
-    // the diagram is opened through a temporary HTML page instead,
-    // which redirects from JavaScript (issue #54).
-    let tmpFile;
-
-    if (url.length <= WIN_URL_FILE_MAX_LENGTH)
-    {
-      tmpFile = join(tmpdir(), "drawio-mcp-" + Date.now() + ".url");
-      writeFileSync(tmpFile, "[InternetShortcut]\r\nURL=" + url + "\r\n");
-    }
-    else
-    {
-      tmpFile = join(tmpdir(), "drawio-mcp-" + Date.now() + ".html");
-      writeFileSync(tmpFile, buildRedirectHtml(url));
-    }
-
-    child = spawn("cmd", ["/c", "start", "", tmpFile], { shell: false, stdio: "ignore" });
-
-    setTimeout(function()
-    {
-      try { unlinkSync(tmpFile); } catch (e) { /* ignore */ }
-    }, 10000);
-  }
-  else if (process.platform === "darwin")
-  {
-    child = spawn("open", [url], { shell: false, stdio: "ignore" });
-  }
-  else
-  {
-    child = spawn("xdg-open", [url], { shell: false, stdio: "ignore" });
-  }
-
-  child.on("error", function(error)
-  {
-    console.error(`Failed to open browser: ${error.message}`);
-  });
-
-  child.unref();
-}
-
-/**
- * Compresses data using pako deflateRaw and encodes as base64
- * This matches the compression used by draw.io tools
- */
-function compressData(data)
-{
-  if (!data || data.length === 0)
-  {
-    return data;
-  }
-  const encoded = encodeURIComponent(data);
-  const compressed = pako.deflateRaw(encoded);
-  return Buffer.from(compressed).toString("base64");
-}
-
-/**
- * Generates a draw.io URL with the #create hash parameter
- */
-function generateDrawioUrl(data, type, options = {})
-{
-  const {
-    lightbox = false,
-    border = 10,
-    dark = false,
-    edit = "_blank",
-  } = options;
-
-  const compressedData = compressData(data);
-
-  const createObj = {
-    type: type,
-    compressed: true,
-    data: compressedData,
-  };
-
-  const params = new URLSearchParams();
-
-  if (lightbox)
-  {
-    params.set("lightbox", "1");
-    params.set("edit", "_blank");
-    params.set("border", "10");
-  }
-  else
-  {
-    params.set("grid", "0");
-    params.set("pv", "0");
-  }
-
-  if (dark === true)
-  {
-    params.set("dark", "1");
-  }
-
-  params.set("border", border.toString());
-  params.set("edit", edit);
-
-  const createHash = "#create=" + encodeURIComponent(JSON.stringify(createObj));
-  const paramsStr = params.toString();
-
-  return DRAWIO_BASE_URL + (paramsStr ? "?" + paramsStr : "") + createHash;
-}
-
 // Define the tools
 const tools =
 [
   {
     name: "open_drawio_xml",
     description:
-      "Opens the draw.io editor with a diagram from XML content. " +
+      "Opens the local draw.io desktop app with a diagram from XML content. " +
       "Use this to view, edit, or create diagrams in draw.io format. " +
       "The XML should be valid draw.io/mxGraph XML format.\n\n" +
       xmlReference,
@@ -373,7 +222,7 @@ const tools =
   {
     name: "open_drawio_csv",
     description:
-      "Opens the draw.io editor with a diagram generated from CSV data. " +
+      "Opens the local draw.io desktop app with a diagram generated from CSV data. " +
       "The CSV format should follow draw.io's CSV import specification which allows " +
       "creating org charts, flowcharts, and other diagrams from tabular data.",
     inputSchema:
@@ -405,7 +254,7 @@ const tools =
   {
     name: "open_drawio_mermaid",
     description:
-      "Opens the draw.io editor with a diagram generated from Mermaid.js syntax. " +
+      "Opens the local draw.io desktop app with a diagram generated from Mermaid.js syntax. " +
       "Supports flowcharts, sequence diagrams, class diagrams, state diagrams, " +
       "entity relationship diagrams, and more using Mermaid.js syntax.\n\n" +
       mermaidReference,
@@ -765,25 +614,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) =>
         };
     }
 
-    // XML only: optional libavoid obstacle-avoiding edge-routing pass before
-    // the diagram is compressed into the URL. routeXml never throws — it
-    // returns the original XML if routing isn't applicable or anything fails.
+    // XML only: optional libavoid obstacle-avoiding edge-routing pass
+    // before the diagram is opened. routeXml never throws — it returns
+    // the original XML if routing isn't applicable or anything fails.
     if (type === "xml" && args?.routing === "libavoid")
     {
       content = await routeXml(content);
     }
 
-    const url = generateDrawioUrl(content, type, { lightbox, dark });
-
-    // Open the URL in the default browser
-    openBrowser(url);
+    const opened = openDiagram({ content, type, lightbox, dark });
 
     return {
       content:
       [
         {
           type: "text",
-          text: `Draw.io Editor URL:\n${url}\n\nThe diagram has been opened in your default browser.`,
+          text: opened.message,
         },
       ],
     };
