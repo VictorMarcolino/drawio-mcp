@@ -1,7 +1,7 @@
 {
   "name": "@drawio/mcp",
   "version": "1.5.0",
-  "description": "Official draw.io MCP server for LLMs - Open diagrams in draw.io editor",
+  "description": "draw.io MCP server for LLMs — opens diagrams in the draw.io desktop app",
   "type": "module",
   "main": "src/index.js",
   "bin": {
@@ -31,11 +31,11 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jgraph/drawio-mcp.git"
+    "url": "https://github.com/VictorMarcolino/drawio-mcp.git"
   },
-  "homepage": "https://github.com/jgraph/drawio-mcp#readme",
+  "homepage": "https://github.com/VictorMarcolino/drawio-mcp#readme",
   "bugs": {
-    "url": "https://github.com/jgraph/drawio-mcp/issues"
+    "url": "https://github.com/VictorMarcolino/drawio-mcp/issues"
   },
   "engines": {
     "node": ">=18.0.0"

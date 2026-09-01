@@ -1,8 +1,8 @@
 # Draw.io MCP Tool Server
 
-The official [draw.io](https://www.draw.io) MCP server that opens diagrams directly in the draw.io editor. Supports XML, CSV, and Mermaid.js formats with lightbox and dark mode options.
+The official [draw.io](https://www.draw.io) MCP server that opens diagrams in the local draw.io desktop app by default. Supports XML, CSV, and Mermaid.js. Set `DRAWIO_OPEN=browser` for the upstream web editor.
 
-This package is part of the [drawio-mcp](https://github.com/jgraph/drawio-mcp) repository, which also includes:
+This fork is [VictorMarcolino/drawio-mcp](https://github.com/VictorMarcolino/drawio-mcp). Upstream: [jgraph/drawio-mcp](https://github.com/jgraph/drawio-mcp). Also in this repo:
 
 - **[MCP App Server](https://github.com/jgraph/drawio-mcp/tree/main/mcp-app-server)** — Renders diagrams inline in AI chat interfaces. Hosted at `https://mcp.draw.io/mcp` — no install required.
 - **[Claude Code Plugin](https://github.com/jgraph/drawio-mcp/tree/main/plugins/claude-code)** — Claude Code plugin that generates native `.drawio` files with optional PNG/SVG/PDF export.
@@ -17,27 +17,28 @@ This package is part of the [drawio-mcp](https://github.com/jgraph/drawio-mcp) r
 
 ## Installation
 
-### Using npx (recommended)
+### From this fork
 
 ```bash
-npx @drawio/mcp
+git clone https://github.com/VictorMarcolino/drawio-mcp.git
+cd drawio-mcp/mcp-tool-server
+npm install
+node src/index.js
 ```
+
+Upstream `npx @drawio/mcp` still opens the **browser**. This fork defaults to desktop.
 
 ### Global installation
 
 ```bash
-npm install -g @drawio/mcp
+cd drawio-mcp/mcp-tool-server
+npm install -g .
 drawio-mcp
 ```
 
 ### From source
 
-```bash
-git clone https://github.com/jgraph/drawio-mcp.git
-cd drawio-mcp/mcp-tool-server
-npm install
-npm start
-```
+Same as [From this fork](#from-this-fork). Upstream clone: [jgraph/drawio-mcp](https://github.com/jgraph/drawio-mcp).
 
 ## Configuration
 
@@ -52,8 +53,8 @@ Add to your Claude Desktop configuration file:
 {
   "mcpServers": {
     "drawio": {
-      "command": "npx",
-      "args": ["@drawio/mcp"]
+      "command": "node",
+      "args": ["/path/to/drawio-mcp/mcp-tool-server/src/index.js"]
     }
   }
 }
@@ -62,7 +63,7 @@ Add to your Claude Desktop configuration file:
 ### Claude Code
 
 ```bash
-claude mcp add drawio -- npx -y @drawio/mcp
+claude mcp add drawio -- node /path/to/drawio-mcp/mcp-tool-server/src/index.js
 ```
 
 Or manually in `.claude/settings.json`:
@@ -71,8 +72,8 @@ Or manually in `.claude/settings.json`:
 {
   "mcpServers": {
     "drawio": {
-      "command": "npx",
-      "args": ["-y", "@drawio/mcp"]
+      "command": "node",
+      "args": ["/path/to/drawio-mcp/mcp-tool-server/src/index.js"]
     }
   }
 }
@@ -99,32 +100,54 @@ Then click **Start** above the server entry, **trust** the server when prompted,
 
 ### Cursor
 
-[![Install MCP Server](https://cursor.com/deeplink/mcp-install-dark.svg)](https://cursor.com/en/install-mcp?name=drawio&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBkcmF3aW8vbWNwIl19)
-
-Click the button above for one-click install, or add the server manually to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` in your project:
+Add the server to `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` in your project:
 
 ```json
 {
   "mcpServers": {
     "drawio": {
-      "command": "npx",
-      "args": ["-y", "@drawio/mcp"]
+      "command": "node",
+      "args": ["/path/to/drawio-mcp/mcp-tool-server/src/index.js"]
     }
   }
 }
 ```
 
-Enable the server when prompted (or under **Cursor Settings → MCP**), then ask the Agent to create a diagram — it opens in the draw.io editor in your browser.
+Enable the server when prompted (or under **Cursor Settings → MCP**), then ask the Agent to create a diagram — it opens in the **draw.io desktop** app by default (`DRAWIO_OPEN=desktop`). Set `DRAWIO_OPEN=browser` to keep the upstream browser tab.
 
-> **Tip:** Cursor also supports the [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) extension, so the hosted [MCP App Server](../mcp-app-server) at `https://mcp.draw.io/mcp` works in Cursor too, rendering diagrams *inline* in chat instead of opening a browser tab. Use this stdio server if you prefer diagrams to open in the full draw.io editor.
+> **Tip:** Cursor also supports the [MCP Apps](https://modelcontextprotocol.io/docs/extensions/apps) extension, so the hosted [MCP App Server](../mcp-app-server) at `https://mcp.draw.io/mcp` works in Cursor too, rendering diagrams *inline* in chat instead of opening an editor. Use this stdio server if you prefer the full draw.io editor (desktop or browser).
 
 ### Other MCP Clients
 
 Configure your MCP client to run the server via stdio:
 
 ```bash
-npx @drawio/mcp
+node /path/to/drawio-mcp/mcp-tool-server/src/index.js
 ```
+
+### Desktop draw.io (default in this fork)
+
+By default this server writes a temporary `.drawio` / `.mmd` / `.csv` file and
+opens it with the **local draw.io app** (`drawio` on PATH, or `DRAWIO_CMD`).
+
+```json
+{
+  "mcpServers": {
+    "drawio": {
+      "command": "node",
+      "args": ["/path/to/drawio-mcp/mcp-tool-server/src/index.js"],
+      "env": {
+        "DRAWIO_OPEN": "desktop",
+        "DRAWIO_CMD": "drawio"
+      }
+    }
+  }
+}
+```
+
+Run `npm install` in `mcp-tool-server` first. Set `DRAWIO_OPEN=browser` to use a
+`#create=` URL in the default browser instead (upstream behaviour).
+`DRAWIO_BASE_URL` only applies in that mode.
 
 ### Self-hosted draw.io
 
